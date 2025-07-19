@@ -179,7 +179,7 @@ public partial class CraftPage : PanelContainer, IPage
 		var itemName = craftingItem.Tier > -1 ? $"{craftingItem.Name} (T{craftingItem.Tier})" : craftingItem.Name;
 		var genericName = craftingItem.Tier > -1 ? $"{craftingItem.GenericName} — T{craftingItem.Tier}" : craftingItem.GenericName;
 
-		csv.AppendLine($"{itemName},{genericName},{skillName},{quantityString},0");
+		csv.AppendLine($"{itemName},{genericName},{skillName},{quantityString.Replace(",", "")},0");
 
 		// Traverse children
 		foreach (var child in item.GetChildren())
