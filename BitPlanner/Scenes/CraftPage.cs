@@ -123,6 +123,7 @@ public partial class CraftPage : PanelContainer, IPage
         { _currentRecipeTab.AllCollapsed ? "Expand Tree" : "Collapse Tree", ToggleCollapse },
         { "Copy Trees As Text", CopyTreesAsText },
         { "Copy Trees As CSV", CopyTreesAsCSV },
+        { "Copy Total Materials to CSV", CopyCombinedMaterialsAsCSV },
         { "Show Base Ingredients", ShowBaseIngredients }
     };
 
@@ -156,6 +157,24 @@ public partial class CraftPage : PanelContainer, IPage
         }
         DisplayServer.ClipboardSet(result.ToString().Trim());
     }
+
+    public void CopyCombinedMaterialsAsCSV()
+	{
+		var combinedMaterials = new Dictionary<string, (int minQuantity, int maxQuantity)>();
+		foreach (var tab in _recipeTabs.GetChildren().Cast<RecipeTab>())
+		{
+			tab.AccumulateMaterials(ref combinedMaterials);
+		}
+
+		var csv = new StringBuilder();
+		csv.AppendLine("Item,Minimum Quantity,Maximum Quantity,In Stock");
+		foreach (var (name, (min, max)) in combinedMaterials)
+		{
+			csv.AppendLine($"{name},{min},{(max > 0 ? max.ToString() : "?")},0");
+		}
+
+		DisplayServer.ClipboardSet(csv.ToString().Trim());
+	}
 
     private void ShowBaseIngredients()
     {
