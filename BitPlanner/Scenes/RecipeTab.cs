@@ -172,6 +172,13 @@ public partial class RecipeTab : VBoxContainer
         return csv.ToString();
     }
 
+    public void AccumulateMaterials(ref Dictionary<string, (int minQuantity, int maxQuantity)> materials)
+	{
+		var root = _recipeTree.GetRoot();
+		var currentRow = 1u;
+		TraverseAndAccumulateMaterials(root, [], ref materials, ref currentRow);
+	}
+
     public void GetBaseIngredients(ref Dictionary<ulong, (int, int)> data) => TraverseAndCountBaseIngredients(_recipeTree.GetRoot(), ref data);
 
     public static string GetQuantityString(uint minQuantity, uint maxQuantity)
@@ -355,6 +362,58 @@ public partial class RecipeTab : VBoxContainer
             TraverseAndAppendCSV(child, newRelationshipLines, ref csv, ref currentRow, childRow);
         }
     }
+
+    private void TraverseAndAccumulateMaterials(TreeItem parent, bool[] relationshipLines, ref Dictionary<string, (int minQuantity, int maxQuantity)> materials, ref uint currentRow)
+	{
+		if (Config.IgnoreHiddenInTreesExport && parent.Collapsed)
+			return;
+
+		if (parent.GetChildCount() == 0)
+			return;
+
+		var parentMeta = ItemMetadata.FromGodotArray(parent.GetMetadata(0).AsGodotArray());
+		var recipe = _data.CraftingItems[parentMeta.Id].Recipes[(int)parentMeta.RecipeIndex];
+		var (minOutput, maxOutput) = CalculateRecipeOutput(recipe);
+
+		foreach (var child in parent.GetChildren())
+		{
+			var meta = ItemMetadata.FromGodotArray(child.GetMetadata(0).AsGodotArray());
+			var consumedQuantity = recipe.ConsumedItems[child.GetIndex()].Quantity;
+
+			var estimatedMin = (int)((long)Math.Ceiling((double)parentMeta.MinQuantity / maxOutput) * consumedQuantity);
+
+			int estimatedMax;
+			if (minOutput > 0 && parentMeta.MaxQuantity > 0)
+			{
+				estimatedMax = (int)((long)Math.Ceiling((double)parentMeta.MaxQuantity / minOutput) * consumedQuantity);
+				if (estimatedMax == estimatedMin)
+				{
+					estimatedMax = estimatedMin;
+				}
+			}
+			else
+			{
+				estimatedMax = estimatedMin;
+			}
+
+			var name = child.GetText(0);
+			if (!materials.ContainsKey(name))
+			{
+				materials[name] = (0, 0);
+			}
+
+			var (existingMin, existingMax) = materials[name];
+			var newMin = existingMin + estimatedMin;
+			var newMax = estimatedMax >= 0 && existingMax >= 0 ? existingMax + estimatedMax : -1;
+
+			materials[name] = (
+				(int)(existingMin + estimatedMin),
+				(estimatedMax >= 0 && existingMax >= 0) ? (int)(existingMax + estimatedMax) : -1
+			);
+
+			TraverseAndAccumulateMaterials(child, relationshipLines.Append(child.GetIndex() != parent.GetChildCount() - 1).ToArray(), ref materials, ref currentRow);
+		}
+	}
 
     private void BuildTree(TreeItem treeItem, ItemMetadata meta)
     {
